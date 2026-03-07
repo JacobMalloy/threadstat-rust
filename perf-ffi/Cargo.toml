@@ -1,0 +1,13 @@
+[package]
+name = "perf-ffi"
+version = "0.1.0"
+edition = "2024"
+
+[build-dependencies]
+bindgen = "0.71"
+
+[dependencies]
+libc = "0.2.181"
+string-intern = {workspace=true}
+zerocopy = { version = "0.8.40", features = ["derive"] }
+non-empty = {path = "../non-empty/"}

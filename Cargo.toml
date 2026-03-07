@@ -1,0 +1,17 @@
+[workspace]
+members = ["non-empty","perf-ffi"]
+resolver = "3"
+
+[workspace.dependencies]
+string-intern = {git = "https://github.com/JacobMalloy/string-intern.git", version = "0.1.x"}
+
+[package]
+name = "threadstat-rust"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+clap = { version = "4.5.60", features = ["derive"] }
+perf-ffi = { path = "perf-ffi" }
+string-intern = {workspace=true}
+non-empty = {path = "./non-empty/"}
