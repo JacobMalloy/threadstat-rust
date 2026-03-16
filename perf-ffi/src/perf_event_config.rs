@@ -1,8 +1,11 @@
 use crate::sys;
 use sys::perf_event_attr;
 
-#[derive(Clone, Copy, Debug)]
-pub struct PerfConfig(pub(crate) sys::perf_event_attr);
+#[derive(Clone, Debug)]
+pub struct PerfConfig<N> {
+    pub(crate) attr: sys::perf_event_attr,
+    pub name: N,
+}
 
 #[repr(u32)]
 #[derive(Clone, Copy)]
@@ -70,7 +73,13 @@ impl CacheResult {
     }
 }
 
-impl PerfConfig {
+impl<N> AsRef<PerfConfig<N>> for PerfConfig<N> {
+    fn as_ref(&self) -> &PerfConfig<N> {
+        self
+    }
+}
+
+impl<N> PerfConfig<N> {
     unsafe fn default_perf_event_attr() -> sys::perf_event_attr {
         let mut rv: perf_event_attr = unsafe { core::mem::zeroed() };
         rv.size = size_of::<sys::perf_event_attr>() as u32;
@@ -78,23 +87,23 @@ impl PerfConfig {
     }
 
     pub fn set_exlude_hv(mut self, value: bool) -> Self {
-        self.0.set_exclude_hv(if value { 1 } else { 0 });
+        self.attr.set_exclude_hv(if value { 1 } else { 0 });
         self
     }
 
-    pub fn hardware_event(event: HardwareEvent) -> Self {
+    pub fn hardware_event(event: HardwareEvent, name: N) -> Self {
         let mut attr = unsafe { Self::default_perf_event_attr() };
         attr.type_ = sys::perf_type_id_PERF_TYPE_HARDWARE;
         attr.config = event.get_value() as u64;
-        PerfConfig(attr).set_exlude_hv(true)
+        PerfConfig { attr, name }.set_exlude_hv(true)
     }
 
-    pub fn hardware_cache_event(cache: CacheId, op: CacheOperation, result: CacheResult) -> Self {
+    pub fn hardware_cache_event(cache: CacheId, op: CacheOperation, result: CacheResult, name: N) -> Self {
         let mut attr = unsafe { Self::default_perf_event_attr() };
         attr.type_ = sys::perf_type_id_PERF_TYPE_HW_CACHE;
         attr.config =
             (cache.get_value() | (op.get_value() << 8) | (result.get_value() << 16)) as u64;
-        PerfConfig(attr).set_exlude_hv(true)
+        PerfConfig { attr, name }.set_exlude_hv(true)
     }
 }
 

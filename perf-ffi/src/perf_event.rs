@@ -15,32 +15,22 @@ use std::io;
 use std::os::fd::{AsFd, AsRawFd, BorrowedFd, FromRawFd, OwnedFd, RawFd};
 use zerocopy::FromBytes;
 
-pub trait LazyOwned<U> {
-    fn owned(self) -> U;
-    fn borrowed(&self) -> &U;
-}
-
-impl<U> LazyOwned<U> for U {
-    fn owned(self) -> U {
-        self
-    }
-    fn borrowed(&self) -> &U {
-        self
-    }
-}
-
-impl<U: Clone> LazyOwned<U> for &U {
-    fn owned(self) -> U {
-        self.clone()
-    }
-    fn borrowed(&self) -> &U {
-        self
-    }
-}
-
 pub struct PerfEvent<NameType> {
     fd: OwnedFd,
     name: NameType,
+}
+
+impl<NameType> PerfEvent<NameType> {
+    fn get_id(&self) -> Result<u64, std::io::Error> {
+        let mut return_value: u64 = 0;
+        let ioctl_res =
+            unsafe { libc::ioctl(self.fd.as_raw_fd(), sys::PERF_EVENT_IOC_ID_CONST, &mut return_value) };
+        if ioctl_res != 0 {
+            Err(std::io::Error::last_os_error())
+        } else {
+            Ok(return_value)
+        }
+    }
 }
 
 fn perf_event_open(
@@ -67,44 +57,32 @@ fn perf_event_open(
     }
 }
 
-impl<NameType> PerfEvent<NameType> {
-    pub fn new(config: &PerfConfig, pid: pid_t, name: NameType) -> Result<Self, io::Error> {
-        Ok(PerfEvent {
-            fd: perf_event_open(&(config.0), pid, -1, -1, PERF_FLAG_FD_CLOEXEC as u64)?,
-            name,
-        })
-    }
-}
-
 pub struct PerfEventGroup<T> {
     fds: NonEmpty<PerfEvent<T>>,
 }
 
-impl<T> PerfEventGroup<T> {
-    pub fn new<V: LazyOwned<PerfConfig>, I: IntoIterator<Item = (V, T)>>(
+impl<T: Clone> PerfEventGroup<T> {
+    pub fn new<V: AsRef<PerfConfig<T>>, I: IntoIterator<Item = V>>(
         input: I,
         pid: pid_t,
     ) -> Result<Self, crate::error::Error> {
         let mut it = input.into_iter();
-        let (first_config, first_name) = it.next().ok_or(crate::error::Error::empty())?;
-        let mut first_config: PerfConfig = first_config.owned();
-        first_config.0.read_format = (perf_event_read_format_PERF_FORMAT_GROUP
+        let first = it.next().ok_or(crate::error::Error::empty())?;
+        let first_config = first.as_ref();
+        let mut first_attr = first_config.attr;
+        first_attr.read_format = (perf_event_read_format_PERF_FORMAT_GROUP
             | perf_event_read_format_PERF_FORMAT_TOTAL_TIME_ENABLED
             | perf_event_read_format_PERF_FORMAT_TOTAL_TIME_RUNNING
             | perf_event_read_format_PERF_FORMAT_ID) as u64;
-        let first_fd = perf_event_open(&first_config.0, pid, -1, -1, PERF_FLAG_FD_CLOEXEC as u64)?;
+        let first_fd = perf_event_open(&first_attr, pid, -1, -1, PERF_FLAG_FD_CLOEXEC as u64)?;
         let first_raw = first_fd.as_raw_fd();
+        let first_name = first_config.name.clone();
 
-        let rest_iterator = it.map(|(config, name)| {
+        let rest_iterator = it.map(|config| {
+            let c = config.as_ref();
             <Result<PerfEvent<T>, std::io::Error>>::Ok(PerfEvent {
-                fd: perf_event_open(
-                    &config.borrowed().0,
-                    pid,
-                    -1,
-                    first_raw,
-                    PERF_FLAG_FD_CLOEXEC as u64,
-                )?,
-                name,
+                fd: perf_event_open(&c.attr, pid, -1, first_raw, PERF_FLAG_FD_CLOEXEC as u64)?,
+                name: c.name.clone(),
             })
         });
 
@@ -122,7 +100,9 @@ impl<T> PerfEventGroup<T> {
                 .ok_or(crate::error::Error::empty())?,
         })
     }
+}
 
+impl<T> PerfEventGroup<T> {
     pub fn len(&self) -> usize {
         self.fds.len()
     }
@@ -170,5 +150,9 @@ impl<T> PerfEventGroup<T> {
 
     pub fn names(&self) -> impl Iterator<Item = &T> {
         self.fds.iter().map(|x| &x.name)
+    }
+
+    pub fn name_and_ids(&self) -> impl Iterator<Item = Result<(&T, u64), std::io::Error>> {
+        self.fds.iter().map(|x| Ok((&x.name, x.get_id()?)))
     }
 }

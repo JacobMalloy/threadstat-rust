@@ -57,13 +57,14 @@ impl PFMInterior {
     }
 }
 
-impl perf_event_config::PerfConfig {
-    pub fn from_pfm_string(event: impl AsRef<CStr>) -> Result<PerfConfig, Error> {
-        Ok(PerfConfig(
-            PFM.as_ref()
+impl<N> perf_event_config::PerfConfig<N> {
+    pub fn from_pfm_string(event: impl AsRef<CStr>, name: N) -> Result<PerfConfig<N>, Error> {
+        Ok(PerfConfig {
+            attr: PFM.as_ref()
                 .map_err(Clone::clone)?
                 .get_perf_attr_array(event)?,
-        ))
+            name,
+        })
     }
 }
 
