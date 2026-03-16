@@ -38,7 +38,6 @@ __attribute__((constructor)) static void constructor() {
     msg.flags = MESSAGE_FLAG_ADD_PROCESS;
 
     int send_return = mq_send(pid_message_queue, (char*)&msg, sizeof(struct message), 0);
-    fprintf(stderr,"size %d",sizeof(struct message));
     if (send_return == -1) {
         perror("Failed to send to message queue!");
         exit(EXIT_FAILURE);
