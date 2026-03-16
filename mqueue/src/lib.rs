@@ -15,10 +15,10 @@ pub struct MQueueReader<'a, T> {
 
 impl<'a, T> MQueueReader<'a, T> {
     pub fn new(path: &'a CStr) -> Result<Self, std::io::Error> {
-        let mut attr:libc::mq_attr = unsafe{core::mem::zeroed()};
-        attr.mq_msgsize=size_of::<T>() as i64;
-        attr.mq_maxmsg=50;
-        
+        let mut attr: libc::mq_attr = unsafe { core::mem::zeroed() };
+        attr.mq_msgsize = size_of::<T>() as i64;
+        attr.mq_maxmsg = 50;
+        let prev_umask = unsafe { libc::umask(0) };
         let ret = unsafe {
             libc::mq_open(
                 path.as_ptr(),
@@ -27,10 +27,10 @@ impl<'a, T> MQueueReader<'a, T> {
                 &attr,
             )
         };
+        unsafe {libc::umask(prev_umask)};
         if ret == -1 {
             Err(std::io::Error::last_os_error())
         } else {
-            unsafe { libc::fchmod(ret, 0o666) };
             Ok(Self {
                 fd: unsafe { OwnedFd::from_raw_fd(ret) },
                 name: path,

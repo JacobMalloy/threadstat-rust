@@ -13,13 +13,16 @@ struct PerfGroupReaderInner {
 
 pub struct PerfGroupReader(Option<PerfGroupReaderInner>);
 
-#[derive(Clone,Copy,Debug)]
-pub struct PerfReadValue<'a, T> {
-    pub name: &'a T,
-    pub count: u64,
-    pub time_running: u64,
+#[derive(Clone, Copy, Debug)]
+pub struct GroupInfo {
     pub time_enabled: u64,
+    pub time_running: u64,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct EventInfo {
     pub id: u64,
+    pub count: u64,
 }
 
 const fn necessary_buffer_size(count: usize) -> usize {
@@ -71,22 +74,18 @@ impl PerfGroupReader {
         PerfGroupReader(None)
     }
 
-    pub fn read_group<'group, T>(
-        &mut self,
-        group: &'group PerfEventGroup<T>,
-    ) -> Result<impl Iterator<Item = PerfReadValue<'group, T>>, crate::error::Error> {
+    pub fn read_group<'a, T>(
+        &'a mut self,
+        group: &PerfEventGroup<T>,
+    ) -> Result<(GroupInfo, impl Iterator<Item = EventInfo> + 'a), crate::error::Error> {
         let buf = self.ensure_sized(group.len());
         let (header, events) = group.read(buf)?;
-        Ok(events
-            .iter()
-            .zip(group.names())
-            .map(|(event, name)| PerfReadValue {
-                name,
-                count: event.value,
-                time_running: header.time_running,
-                time_enabled: header.time_enabled,
-                id: event.id,
-            }))
+        let group_info = GroupInfo {
+            time_enabled: header.time_enabled,
+            time_running: header.time_running,
+        };
+        let event_iter = events.iter().map(|e| EventInfo { id: e.id, count: e.value });
+        Ok((group_info, event_iter))
     }
 }
 

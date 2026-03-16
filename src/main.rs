@@ -169,23 +169,19 @@ impl State {
                 .unwrap_or_default()
                 .as_nanos();
             match self.reader.read_group(group) {
-                Ok(values) => {
-                    let mut first = true;
-                    for v in values {
-                        if first {
-                            if let Err(e) = writeln!(
-                                self.csv.read,
-                                "{read_id},{timestamp},{},{}",
-                                v.time_running, v.time_enabled
-                            ) {
-                                eprintln!("read csv write error: {e}");
-                            }
-                            first = false;
-                        }
-                        if let Err(e) =
-                            writeln!(self.csv.event, "{read_id},{},{}", v.count, v.id)
+                Ok((group_info, events)) => {
+                    if let Err(e) = writeln!(
+                        self.csv.read,
+                        "{read_id},{timestamp},{},{}",
+                        group_info.time_running, group_info.time_enabled
+                    ) {
+                        eprintln!("read csv write error: {e}");
+                    }
+                    for e in events {
+                        if let Err(err) =
+                            writeln!(self.csv.event, "{read_id},{},{}", e.count, e.id)
                         {
-                            eprintln!("event csv write error: {e}");
+                            eprintln!("event csv write error: {err}");
                         }
                     }
                 }
@@ -208,10 +204,13 @@ impl State {
 }
 
 fn main() {
+    let mq = ThreadstatMQReader::new(MQ_NAME).expect("failed to open mqueue");
+    println!("Opened Message Queue");
     let Args {
         events,
         output_folder,
     } = Args::parse();
+    println!("Parsed Args");
 
     let event_string = events.join(",");
     let event_configs = parse_event_groups(&event_string).expect("Failed to parse events");
@@ -226,7 +225,7 @@ fn main() {
 
     Signal::block([Signal::SIGINT]).expect("failed to block SIGINT");
     let signal_fd = SignalFD::new([Signal::SIGINT]).expect("failed to create signalfd");
-    let mq = ThreadstatMQReader::new(MQ_NAME).expect("failed to open mqueue");
+    println!("Setup Signal Handling");
 
     {
         let mut poller = Poller::new();
@@ -249,5 +248,6 @@ fn main() {
         });
         poller.run().expect("poll error");
     } // poller and closures dropped, releasing the mutable borrow of state
+    println!("Finished the polling loop");
     state.flush_all();
 }
