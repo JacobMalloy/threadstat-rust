@@ -44,7 +44,7 @@ impl PerfGroupReader {
         let tmp = match self.0.take() {
             Some(PerfGroupReaderInner { data, layout }) => {
                 if min_size > layout.size() {
-                    let l = Self::get_layout_from_count(min_size).expect("Invalid Layout");
+                    let l = Self::get_layout_from_count(count).expect("Invalid Layout");
                     let p = unsafe { realloc(data.as_ptr(), layout, min_size) };
                     let nn = NonNull::new(p).expect("Realloc returned NULL");
                     PerfGroupReaderInner {
@@ -56,7 +56,7 @@ impl PerfGroupReader {
                 }
             }
             None => {
-                let l = Self::get_layout_from_count(min_size).expect("Invalide Layout");
+                let l = Self::get_layout_from_count(count).expect("Invalid Layout");
                 let p = unsafe { alloc(l) };
                 let nn = NonNull::new(p).expect("Allocation returned NULL");
                 PerfGroupReaderInner {
