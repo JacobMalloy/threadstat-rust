@@ -65,7 +65,7 @@ impl<T: Clone> PerfEventGroup<T> {
     pub fn new<V: AsRef<PerfConfig<T>>, I: IntoIterator<Item = V>>(
         input: I,
         pid: pid_t,
-    ) -> Result<Self, crate::error::Error> {
+    ) -> Result<Self, crate::error::Error<'static>> {
         let mut it = input.into_iter();
         let first = it.next().ok_or(crate::error::Error::empty())?;
         let first_config = first.as_ref();
@@ -123,7 +123,7 @@ impl<T> PerfEventGroup<T> {
             &'a read_structs::PerfGroupReadHeader,
             &'a [read_structs::PerfGroupReadEntry],
         ),
-        crate::error::Error,
+        crate::error::Error<'a>,
     > {
         let len = self.fds.len();
         let read_val = unsafe {
@@ -140,11 +140,10 @@ impl<T> PerfEventGroup<T> {
         }
 
         let (header, remaining) =
-            read_structs::PerfGroupReadHeader::ref_from_prefix(buffer).unwrap();
+            read_structs::PerfGroupReadHeader::ref_from_prefix(buffer)?;
         debug_assert_eq!(header.nr, len as u64);
         let events =
-            <[read_structs::PerfGroupReadEntry]>::ref_from_bytes_with_elems(remaining, len)
-                .unwrap();
+            <[read_structs::PerfGroupReadEntry]>::ref_from_bytes_with_elems(remaining, len)?;
         Ok((header, events))
     }
 

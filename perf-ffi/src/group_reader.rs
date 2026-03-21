@@ -77,7 +77,7 @@ impl PerfGroupReader {
     pub fn read_group<'a, T>(
         &'a mut self,
         group: &PerfEventGroup<T>,
-    ) -> Result<(GroupInfo, impl Iterator<Item = EventInfo> + 'a), crate::error::Error> {
+    ) -> Result<(GroupInfo, impl Iterator<Item = EventInfo> + 'a), crate::error::Error<'a>> {
         let buf = self.ensure_sized(group.len());
         let (header, events) = group.read(buf)?;
         let group_info = GroupInfo {
