@@ -21,3 +21,7 @@ non-empty = {path = "./non-empty/"}
 mqueue = { path = "mqueue" }
 signals = { path = "signals" }
 poll = { path = "poll" }
+
+[profile.release]
+lto = "fat"
+codegen-units = 1
