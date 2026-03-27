@@ -9,6 +9,7 @@ use crate::perf_event_config::PerfConfig;
 use crate::sys;
 
 use core::ffi::c_void;
+use core::mem::MaybeUninit;
 use libc::{c_int, c_long, c_ulong, pid_t};
 use non_empty::{MaybeNonEmpty, NonEmpty};
 use std::io;
@@ -117,7 +118,7 @@ impl<T> PerfEventGroup<T> {
 
     pub fn read<'a>(
         &'_ self,
-        buffer: &'a mut [u8],
+        buffer: &'a mut [MaybeUninit<u8>],
     ) -> Result<
         (
             &'a read_structs::PerfGroupReadHeader,
@@ -136,9 +137,10 @@ impl<T> PerfEventGroup<T> {
         if read_val < 0 {
             return Err(std::io::Error::last_os_error().into());
         } else if read_val as usize != buffer.len() {
-            unreachable!();
+            debug_assert!(false);
         }
 
+        let buffer: &[u8] = unsafe { &*(buffer as *const [MaybeUninit<u8>] as *const [u8]) };
         let (header, remaining) =
             read_structs::PerfGroupReadHeader::ref_from_prefix(buffer)?;
         debug_assert_eq!(header.nr, len as u64);

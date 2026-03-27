@@ -1,13 +1,14 @@
 use crate::perf_event::PerfEventGroup;
 use crate::read_structs;
 use core::alloc::{Layout, LayoutError};
+use core::mem::MaybeUninit;
 use core::ptr::NonNull;
 use core::slice;
 use std::alloc;
 use std::alloc::{alloc, dealloc, realloc};
 
 struct PerfGroupReaderInner {
-    data: NonNull<u8>,
+    data: NonNull<MaybeUninit<u8>>,
     layout: Layout,
 }
 
@@ -38,15 +39,15 @@ impl PerfGroupReader {
         )
     }
 
-    fn ensure_sized(&'_ mut self, count: usize) -> &'_ mut [u8] {
+    fn ensure_sized(&'_ mut self, count: usize) -> &'_ mut [MaybeUninit<u8>] {
         let min_size = necessary_buffer_size(count);
 
         let tmp = match self.0.take() {
             Some(PerfGroupReaderInner { data, layout }) => {
                 if min_size > layout.size() {
                     let l = Self::get_layout_from_count(count).expect("Invalid Layout");
-                    let p = unsafe { realloc(data.as_ptr(), layout, min_size) };
-                    let nn = NonNull::new(p).expect("Realloc returned NULL");
+                    let p = unsafe { realloc(data.as_ptr() as *mut u8, layout, min_size) };
+                    let nn = NonNull::new(p as *mut MaybeUninit<u8>).expect("Realloc returned NULL");
                     PerfGroupReaderInner {
                         data: nn,
                         layout: l,
@@ -58,7 +59,7 @@ impl PerfGroupReader {
             None => {
                 let l = Self::get_layout_from_count(count).expect("Invalid Layout");
                 let p = unsafe { alloc(l) };
-                let nn = NonNull::new(p).expect("Allocation returned NULL");
+                let nn = NonNull::new(p as *mut MaybeUninit<u8>).expect("Allocation returned NULL");
                 PerfGroupReaderInner {
                     data: nn,
                     layout: l,
@@ -99,7 +100,7 @@ impl Drop for PerfGroupReader {
     fn drop(&mut self) {
         if let Some(ref v) = self.0 {
             unsafe {
-                dealloc(v.data.as_ptr(), v.layout);
+                dealloc(v.data.as_ptr() as *mut u8, v.layout);
             }
         }
     }
