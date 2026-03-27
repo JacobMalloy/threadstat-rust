@@ -2,12 +2,18 @@ use std::env;
 use std::path::PathBuf;
 
 fn main() {
+    #[cfg(feature = "pfm")]
     println!("cargo:rustc-link-lib=pfm");
 
-    let bindings = bindgen::Builder::default()
+    let builder = bindgen::Builder::default()
         .header("wrapper.h")
         .derive_default(true)
-        .impl_debug(true)
+        .impl_debug(true);
+
+    #[cfg(feature = "pfm")]
+    let builder = builder.clang_arg("-DUSE_PFM");
+
+    let bindings = builder
         .generate()
         .expect("Unable to generate perf_event bindings");
 

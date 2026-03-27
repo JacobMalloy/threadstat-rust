@@ -15,7 +15,7 @@ bindgen = "0.71"
 
 [dependencies]
 clap = { version = "4.5.60", features = ["derive"] }
-perf-ffi = { path = "perf-ffi" }
+perf-ffi = { path = "perf-ffi", features = ["pfm"] }
 string-intern = {workspace=true}
 non-empty = {path = "./non-empty/"}
 mqueue = { path = "mqueue" }

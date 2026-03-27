@@ -3,8 +3,10 @@
 #include <sys/syscall.h>         /* Definition of SYS_* constants */
 #include <unistd.h>
 
+#ifdef USE_PFM
 #include <perfmon/pfmlib.h>
 #include <perfmon/pfmlib_perf_event.h>
+#endif
 
 /* bindgen cannot evaluate complex macro chains like _IOR(...), so expose
    the ioctl request codes as typed constants it can handle. */

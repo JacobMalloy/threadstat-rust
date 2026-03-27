@@ -3,6 +3,9 @@ name = "perf-ffi"
 version = "0.1.0"
 edition = "2024"
 
+[features]
+pfm = []
+
 [build-dependencies]
 bindgen = "0.71"
 
