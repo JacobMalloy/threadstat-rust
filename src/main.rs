@@ -7,7 +7,7 @@ use std::collections::HashMap;
 use std::error::Error;
 use std::fs::{File, OpenOptions};
 use std::io::{BufWriter, Write};
-use std::path::PathBuf;
+use std::path::{Path,PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 use string_intern::{InteriorNulError, InternC};
@@ -31,7 +31,7 @@ struct Args {
 
 #[derive(Clone, Debug)]
 enum ParseError {
-    PFM(PfmError),
+    Pfm(PfmError),
     InternalNULL(InteriorNulError),
 }
 
@@ -40,7 +40,7 @@ impl Error for ParseError {}
 impl fmt::Display for ParseError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ParseError::PFM(e) => write!(f, "libpfm error:{e}"),
+            ParseError::Pfm(e) => write!(f, "libpfm error:{e}"),
             ParseError::InternalNULL(e) => e.fmt(f),
         }
     }
@@ -48,7 +48,7 @@ impl fmt::Display for ParseError {
 
 impl From<PfmError> for ParseError {
     fn from(e: PfmError) -> ParseError {
-        ParseError::PFM(e)
+        ParseError::Pfm(e)
     }
 }
 
@@ -122,7 +122,7 @@ struct CsvWriters {
 }
 
 impl CsvWriters {
-    fn open(folder: &PathBuf) -> std::io::Result<Self> {
+    fn open(folder: &Path) -> std::io::Result<Self> {
         let mut event = BufWriter::new(
             OpenOptions::new()
                 .write(true)
@@ -189,28 +189,24 @@ impl State {
         self.groups.insert(tid, tid_groups);
     }
 
-    fn flush_tid(&mut self, tid: i32) {
-        let Some(groups) = self.groups.get(&tid) else {
-            return;
-        };
+    fn flush_groups(groups: &[perf_ffi::PerfEventGroup<InternC>], tid: i32, reader: &mut perf_ffi::PerfGroupReader, csv: &mut CsvWriters) {
         for group in groups {
             let read_id = READ_ID.fetch_add(1, Ordering::Relaxed);
             let timestamp = SystemTime::now()
                 .duration_since(UNIX_EPOCH)
                 .unwrap_or_default()
                 .as_nanos();
-            match self.reader.read_group(group) {
+            match reader.read_group(group) {
                 Ok((group_info, events)) => {
                     if let Err(e) = writeln!(
-                        self.csv.read,
+                        csv.read,
                         "{read_id},{timestamp},{},{}",
                         group_info.time_running, group_info.time_enabled
                     ) {
                         eprintln!("read csv write error: {e}");
                     }
                     for e in events {
-                        if let Err(err) = writeln!(self.csv.event, "{read_id},{},{}", e.count, e.id)
-                        {
+                        if let Err(err) = writeln!(csv.event, "{read_id},{},{}", e.count, e.id) {
                             eprintln!("event csv write error: {err}");
                         }
                     }
@@ -220,15 +216,20 @@ impl State {
         }
     }
 
+    fn flush_tid(&mut self, tid: i32) {
+        if let Some(groups) = self.groups.get(&tid) {
+            Self::flush_groups(groups, tid, &mut self.reader, &mut self.csv);
+        }
+    }
+
     fn close_tid(&mut self, tid: i32) {
         self.flush_tid(tid);
         self.groups.remove(&tid);
     }
 
     fn flush_all(&mut self) {
-        let tids: Vec<i32> = self.groups.keys().copied().collect();
-        for tid in tids {
-            self.flush_tid(tid);
+        for (&tid, groups) in &self.groups {
+            Self::flush_groups(groups, tid, &mut self.reader, &mut self.csv);
         }
     }
 }
