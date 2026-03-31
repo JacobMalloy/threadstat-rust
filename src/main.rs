@@ -8,7 +8,7 @@ use std::io::{BufWriter, Write};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
-use string_intern::Intern;
+use string_intern::InternC;
 
 use clap::Parser;
 
@@ -30,7 +30,7 @@ struct Args {
 
 /// Parse "event1,[event2,event3],event4" into Vec<Vec<PerfConfig<Intern>>>.
 /// Top-level commas separate groups; [..] brackets group multiple events together.
-fn parse_event_groups(s: &str) -> Result<Vec<NonEmpty<perf_ffi::PerfConfig<Intern>>>, PfmError> {
+fn parse_event_groups(s: &str) -> Result<Vec<NonEmpty<perf_ffi::PerfConfig<InternC>>>, PfmError> {
     let mut groups = Vec::new();
     let b = s.as_bytes();
     let mut i = 0;
@@ -59,7 +59,7 @@ fn parse_event_groups(s: &str) -> Result<Vec<NonEmpty<perf_ffi::PerfConfig<Inter
                 .map(str::trim)
                 .filter(|e| !e.is_empty())
                 .map(|e| {
-                    let interned = Intern::new(e);
+                    let interned = InternC::new(e);
                     perf_ffi::PerfConfig::from_pfm_string(interned, interned)
                 })
                 .collect();
@@ -73,7 +73,7 @@ fn parse_event_groups(s: &str) -> Result<Vec<NonEmpty<perf_ffi::PerfConfig<Inter
             }
             let name = s[start..i].trim();
             if !name.is_empty() {
-                let interned = Intern::new(name);
+                let interned = InternC::new(name);
                 groups.push(NonEmpty::new_single(
                     perf_ffi::PerfConfig::from_pfm_string(interned, interned)?,
                 ));
@@ -121,8 +121,8 @@ impl CsvWriters {
 }
 
 struct State {
-    event_configs: Vec<NonEmpty<perf_ffi::PerfConfig<Intern>>>,
-    groups: HashMap<i32, Vec<perf_ffi::PerfEventGroup<Intern>>>,
+    event_configs: Vec<NonEmpty<perf_ffi::PerfConfig<InternC>>>,
+    groups: HashMap<i32, Vec<perf_ffi::PerfEventGroup<InternC>>>,
     reader: perf_ffi::PerfGroupReader,
     csv: CsvWriters,
 }
