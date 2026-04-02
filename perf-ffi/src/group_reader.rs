@@ -42,28 +42,25 @@ impl PerfGroupReader {
     fn ensure_sized(&'_ mut self, count: usize) -> &'_ mut [MaybeUninit<u8>] {
         let min_size = necessary_buffer_size(count);
 
-        let tmp = match self.0.take() {
-            Some(PerfGroupReaderInner { data, layout }) => {
-                if min_size > layout.size() {
-                    let l = Self::get_layout_from_count(count).expect("Invalid Layout");
-                    let p = unsafe { realloc(data.as_ptr() as *mut u8, layout, min_size) };
-                    let nn = NonNull::new(p as *mut MaybeUninit<u8>).expect("Realloc returned NULL");
-                    PerfGroupReaderInner {
-                        data: nn,
-                        layout: l,
-                    }
-                } else {
-                    PerfGroupReaderInner { data, layout }
-                }
-            }
-            None => {
+        let tmp = if let Some(PerfGroupReaderInner { data, layout }) = self.0.take() {
+            if min_size > layout.size() {
                 let l = Self::get_layout_from_count(count).expect("Invalid Layout");
-                let p = unsafe { alloc(l) };
-                let nn = NonNull::new(p as *mut MaybeUninit<u8>).expect("Allocation returned NULL");
+                let p = unsafe { realloc(data.as_ptr().cast(), layout, min_size) };
+                let nn = NonNull::new(p.cast()).expect("Realloc returned NULL");
                 PerfGroupReaderInner {
                     data: nn,
                     layout: l,
                 }
+            } else {
+                PerfGroupReaderInner { data, layout }
+            }
+        } else {
+            let l = Self::get_layout_from_count(count).expect("Invalid Layout");
+            let p = unsafe { alloc(l) };
+            let nn = NonNull::new(p.cast()).expect("Allocation returned NULL");
+            PerfGroupReaderInner {
+                data: nn,
+                layout: l,
             }
         };
         let ptr = tmp.data;
@@ -71,10 +68,14 @@ impl PerfGroupReader {
         unsafe { slice::from_raw_parts_mut(ptr.as_ptr(), min_size) }
     }
 
+    #[must_use]
     pub fn new() -> Self {
         PerfGroupReader(None)
     }
 
+    /// # Errors
+    /// Returns an error if the underlying `read(2)` fails or if the kernel data
+    /// cannot be interpreted as the expected perf group read structures.
     pub fn read_group<'a, T>(
         &'a mut self,
         group: &PerfEventGroup<T>,
@@ -85,12 +86,15 @@ impl PerfGroupReader {
             time_enabled: header.time_enabled,
             time_running: header.time_running,
         };
-        let event_iter = events.iter().map(|e| EventInfo { id: e.id, count: e.value });
+        let event_iter = events.iter().map(|e| EventInfo {
+            id: e.id,
+            count: e.value,
+        });
         Ok((group_info, event_iter))
     }
 }
 
-impl Default for PerfGroupReader{
+impl Default for PerfGroupReader {
     fn default() -> Self {
         Self::new()
     }
@@ -100,7 +104,7 @@ impl Drop for PerfGroupReader {
     fn drop(&mut self) {
         if let Some(ref v) = self.0 {
             unsafe {
-                dealloc(v.data.as_ptr() as *mut u8, v.layout);
+                dealloc(v.data.as_ptr().cast(), v.layout);
             }
         }
     }

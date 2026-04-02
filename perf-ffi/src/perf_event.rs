@@ -1,16 +1,15 @@
 use crate::read_structs;
 use crate::sys::{
-    PERF_FLAG_FD_CLOEXEC, perf_event_attr, perf_event_read_format_PERF_FORMAT_GROUP,
+    PERF_FLAG_FD_CLOEXEC, perf_event_read_format_PERF_FORMAT_GROUP,
     perf_event_read_format_PERF_FORMAT_ID, perf_event_read_format_PERF_FORMAT_TOTAL_TIME_ENABLED,
     perf_event_read_format_PERF_FORMAT_TOTAL_TIME_RUNNING,
 };
-
+use std::ptr;
 use crate::perf_event_config::PerfConfig;
 use crate::sys;
 
-use core::ffi::c_void;
 use core::mem::MaybeUninit;
-use libc::{c_int, c_long, c_ulong, pid_t};
+use libc::{c_int, c_ulong, pid_t};
 use non_empty::{MaybeNonEmpty, NonEmpty};
 use std::io;
 use std::os::fd::{AsFd, AsRawFd, BorrowedFd, FromRawFd, OwnedFd, RawFd};
@@ -43,18 +42,20 @@ fn perf_event_open(
 ) -> Result<OwnedFd, std::io::Error> {
     let fd = unsafe {
         libc::syscall(
-            sys::__NR_perf_event_open as c_long,
-            attr as *const perf_event_attr,
+            sys::__NR_perf_event_open.cast_signed().into(),
+            ptr::from_ref(attr),
             pid,
             cpu,
             group_fd,
             flags,
-        ) as i32
+        )
     };
     if fd < 0 {
         Err(io::Error::last_os_error())
     } else {
-        Ok(unsafe { OwnedFd::from_raw_fd(fd) })
+        #[allow(clippy::cast_possible_truncation)]
+        let raw = fd as RawFd;
+        Ok(unsafe { OwnedFd::from_raw_fd(raw) })
     }
 }
 
@@ -63,6 +64,9 @@ pub struct PerfEventGroup<T> {
 }
 
 impl<T: Clone> PerfEventGroup<T> {
+    /// # Errors
+    /// Returns [`crate::error::Error::Empty`] if `input` is empty, or
+    /// [`crate::error::Error::IO`] if any `perf_event_open(2)` syscall fails.
     pub fn new<V: AsRef<PerfConfig<T>>, I: IntoIterator<Item = V>>(
         input: I,
         pid: pid_t,
@@ -74,15 +78,15 @@ impl<T: Clone> PerfEventGroup<T> {
         first_attr.read_format = (perf_event_read_format_PERF_FORMAT_GROUP
             | perf_event_read_format_PERF_FORMAT_TOTAL_TIME_ENABLED
             | perf_event_read_format_PERF_FORMAT_TOTAL_TIME_RUNNING
-            | perf_event_read_format_PERF_FORMAT_ID) as u64;
-        let first_fd = perf_event_open(&first_attr, pid, -1, -1, PERF_FLAG_FD_CLOEXEC as u64)?;
+            | perf_event_read_format_PERF_FORMAT_ID).into();
+        let first_fd = perf_event_open(&first_attr, pid, -1, -1, PERF_FLAG_FD_CLOEXEC.into())?;
         let first_raw = first_fd.as_raw_fd();
         let first_name = first_config.name.clone();
 
         let rest_iterator = it.map(|config| {
             let c = config.as_ref();
             <Result<PerfEvent<T>, std::io::Error>>::Ok(PerfEvent {
-                fd: perf_event_open(&c.attr, pid, -1, first_raw, PERF_FLAG_FD_CLOEXEC as u64)?,
+                fd: perf_event_open(&c.attr, pid, -1, first_raw, PERF_FLAG_FD_CLOEXEC.into())?,
                 name: c.name.clone(),
             })
         });
@@ -104,18 +108,24 @@ impl<T: Clone> PerfEventGroup<T> {
 }
 
 impl<T> PerfEventGroup<T> {
+    #[must_use]
     pub fn len(&self) -> usize {
         self.fds.len()
     }
 
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.fds.is_empty()
     }
 
+    #[must_use]
     pub fn leader_fd(&'_ self) -> BorrowedFd<'_> {
         self.fds.first().fd.as_fd()
     }
 
+    /// # Errors
+    /// Returns an error if the underlying `read(2)` fails or if the kernel data
+    /// cannot be interpreted as the expected perf group read structures.
     pub fn read<'a>(
         &'_ self,
         buffer: &'a mut [MaybeUninit<u8>],
@@ -130,17 +140,16 @@ impl<T> PerfEventGroup<T> {
         let read_val = unsafe {
             libc::read(
                 self.leader_fd().as_raw_fd(),
-                buffer.as_mut_ptr() as *mut c_void,
+                buffer.as_mut_ptr().cast(),
                 buffer.len(),
             )
         };
         if read_val < 0 {
             return Err(std::io::Error::last_os_error().into());
-        } else if read_val as usize != buffer.len() {
+        } else if read_val.cast_unsigned() != buffer.len() {
             debug_assert!(false);
         }
-
-        let buffer: &[u8] = unsafe { &*(buffer as *const [MaybeUninit<u8>] as *const [u8]) };
+        let buffer: &[u8] = unsafe { buffer.assume_init_ref() };
         let (header, remaining) =
             read_structs::PerfGroupReadHeader::ref_from_prefix(buffer)?;
         debug_assert_eq!(header.nr, len as u64);

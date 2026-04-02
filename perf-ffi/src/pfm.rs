@@ -1,6 +1,6 @@
 use crate::{PerfConfig, sys};
 use crate::perf_event_config;
-use core::ffi::{CStr, c_void};
+use core::ffi::{CStr};
 use core::{error, fmt, ptr};
 use std::mem;
 use std::sync::LazyLock;
@@ -17,10 +17,10 @@ fn pfm_strerror(code: sys::pfm_err_t) -> Option<&'static CStr> {
 
 pub static PFM: LazyLock<Result<PFMInterior, Error>> = LazyLock::new(|| {
     let ret = unsafe { sys::pfm_initialize() };
-    if ret != sys::PFM_SUCCESS as i32 {
-        Err(Error(ret))
+    if ret == sys::PFM_SUCCESS.cast_signed(){
+        Ok(PFMInterior{})
     } else {
-        Ok(PFMInterior::default())
+        Err(Error(ret))
     }
 });
 
@@ -29,6 +29,7 @@ pub struct PFMInterior {}
 
 impl PFMInterior {
     fn get_perf_attr_array(&self, event: impl AsRef<CStr>) -> Result<sys::perf_event_attr, Error> {
+        let _ = &self;
         let e = event.as_ref();
         let mut rv = unsafe { mem::zeroed() };
         let mut pfm_arg: sys::pfm_perf_encode_arg_t = sys::pfm_perf_encode_arg_t {
@@ -43,21 +44,24 @@ impl PFMInterior {
         let ret = unsafe {
             sys::pfm_get_os_event_encoding(
                 e.as_ptr(),
-                (sys::PFM_PLM3 | sys::PFM_PLM0 | sys::PFM_PLMH) as i32,
+                (sys::PFM_PLM3 | sys::PFM_PLM0 | sys::PFM_PLMH).cast_signed(),
                 sys::pfm_os_t_PFM_OS_PERF_EVENT,
-                ptr::addr_of_mut!(pfm_arg) as *mut c_void,
+                ptr::addr_of_mut!(pfm_arg).cast(),
             )
         };
 
-        if ret != sys::PFM_SUCCESS as i32 {
-            Err(Error(ret))
-        } else {
+        if ret == sys::PFM_SUCCESS.cast_signed() {
             Ok(rv)
+        } else {
+            Err(Error(ret))
         }
     }
 }
 
 impl<N> perf_event_config::PerfConfig<N> {
+    /// # Errors
+    /// Returns an error if PFM failed to initialize or if the event string is
+    /// not recognized by `pfm_get_os_event_encoding`.
     pub fn from_pfm_string(event: impl AsRef<CStr>, name: N) -> Result<PerfConfig<N>, Error> {
         Ok(PerfConfig {
             attr: PFM.as_ref()

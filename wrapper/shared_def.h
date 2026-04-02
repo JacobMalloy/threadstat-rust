@@ -10,7 +10,7 @@
 
 struct message{
     pid_t tid;
-    int flags;
+    unsigned int flags;
 };
 
 

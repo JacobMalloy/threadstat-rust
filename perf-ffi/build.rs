@@ -8,7 +8,8 @@ fn main() {
     let builder = bindgen::Builder::default()
         .header("wrapper.h")
         .derive_default(true)
-        .impl_debug(true);
+        .impl_debug(true)
+;
 
     #[cfg(feature = "pfm")]
     let builder = builder.clang_arg("-DUSE_PFM");

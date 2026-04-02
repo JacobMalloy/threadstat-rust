@@ -59,7 +59,7 @@ impl From<InteriorNulError> for ParseError {
 }
 
 
-/// Parse "event1,[event2,event3],event4" into Vec<Vec<PerfConfig<Intern>>>.
+/// Parse "event1,[event2,event3],event4" into `Vec<Vec<PerfConfig<Intern>>>`.
 /// Top-level commas separate groups; [..] brackets group multiple events together.
 fn parse_event_groups(s: &str) -> Result<Vec<NonEmpty<perf_ffi::PerfConfig<InternC>>>, ParseError> {
     let mut groups = Vec::new();
@@ -179,7 +179,7 @@ impl State {
 
         // Write event descriptions
         for group in &tid_groups {
-            for (name, id) in group.name_and_ids().filter_map(|r| r.ok()) {
+            for (name, id) in group.name_and_ids().filter_map(Result::ok) {
                 if let Err(e) = writeln!(self.csv.desc, "{id},{name},{tid}") {
                     eprintln!("desc csv write error: {e}");
                 }

@@ -11,9 +11,9 @@ pub enum Error<'a> {
     EntryCast(zerocopy::CastError<&'a[u8], [PerfGroupReadEntry]>),
 }
 
-impl <'a>Error_trait for Error<'a> {}
+impl Error_trait for Error<'_> {}
 
-impl <'a>fmt::Display for Error<'a> {
+impl fmt::Display for Error<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Error::IO(e) => e.fmt(f),
@@ -24,13 +24,14 @@ impl <'a>fmt::Display for Error<'a> {
     }
 }
 
-impl <'a>Error<'a> {
+impl Error<'_> {
+    #[must_use]
     pub fn empty() -> Self {
         Error::Empty
     }
 }
 
-impl <'a>From<std::io::Error> for Error<'a> {
+impl From<std::io::Error> for Error<'_> {
     fn from(value: std::io::Error) -> Self {
         Error::IO(value)
     }

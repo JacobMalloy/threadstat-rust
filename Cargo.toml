@@ -2,6 +2,9 @@
 members = ["mqueue","non-empty","perf-ffi", "signals", "poll"]
 resolver = "3"
 
+[workspace.lints.clippy]
+pedantic = "warn"
+
 [workspace.dependencies]
 string-intern = {git = "https://github.com/JacobMalloy/string-intern.git", version = "0.1.x"}
 
@@ -9,6 +12,9 @@ string-intern = {git = "https://github.com/JacobMalloy/string-intern.git", versi
 name = "threadstat-rust"
 version = "0.1.0"
 edition = "2024"
+
+[lints]
+workspace = true
 
 [build-dependencies]
 bindgen = "0.71"

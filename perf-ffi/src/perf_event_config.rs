@@ -23,8 +23,8 @@ pub enum HardwareEvent {
 }
 
 impl HardwareEvent {
-    fn get_value(&self) -> u32 {
-        (*self) as u32
+    fn get_value(self) -> u32 {
+        self as u32
     }
 }
 
@@ -41,8 +41,8 @@ pub enum CacheId {
 }
 
 impl CacheId {
-    fn get_value(&self) -> u32 {
-        (*self) as u32
+    fn get_value(self) -> u32 {
+        self as u32
     }
 }
 
@@ -55,8 +55,8 @@ pub enum CacheOperation {
 }
 
 impl CacheOperation {
-    fn get_value(&self) -> u32 {
-        (*self) as u32
+    fn get_value(self) -> u32 {
+        self as u32
     }
 }
 
@@ -68,8 +68,8 @@ pub enum CacheResult {
 }
 
 impl CacheResult {
-    fn get_value(&self) -> u32 {
-        (*self) as u32
+    fn get_value(self) -> u32 {
+        self as u32
     }
 }
 
@@ -82,29 +82,37 @@ impl<N> AsRef<PerfConfig<N>> for PerfConfig<N> {
 impl<N> PerfConfig<N> {
     unsafe fn default_perf_event_attr() -> sys::perf_event_attr {
         let mut rv: perf_event_attr = unsafe { core::mem::zeroed() };
-        rv.size = size_of::<sys::perf_event_attr>() as u32;
+        #[allow(clippy::cast_possible_truncation)]
+        let size = size_of::<sys::perf_event_attr>() as u32;
+        rv.size = size;
         rv
     }
 
+    #[must_use]
     pub fn set_exlude_hv(mut self, value: bool) -> Self {
-        self.attr.set_exclude_hv(if value { 1 } else { 0 });
+        self.attr.set_exclude_hv(value.into());
         self
     }
 
+    #[must_use]
     pub fn hardware_event(event: HardwareEvent, name: N) -> Self {
         let mut attr = unsafe { Self::default_perf_event_attr() };
         attr.type_ = sys::perf_type_id_PERF_TYPE_HARDWARE;
-        attr.config = event.get_value() as u64;
+        attr.config = event.get_value().into();
         PerfConfig { attr, name }.set_exlude_hv(true)
     }
 
-    pub fn hardware_cache_event(cache: CacheId, op: CacheOperation, result: CacheResult, name: N) -> Self {
+    #[must_use]
+    pub fn hardware_cache_event(
+        cache: CacheId,
+        op: CacheOperation,
+        result: CacheResult,
+        name: N,
+    ) -> Self {
         let mut attr = unsafe { Self::default_perf_event_attr() };
         attr.type_ = sys::perf_type_id_PERF_TYPE_HW_CACHE;
         attr.config =
-            (cache.get_value() | (op.get_value() << 8) | (result.get_value() << 16)) as u64;
+            (cache.get_value() | (op.get_value() << 8) | (result.get_value() << 16)).into();
         PerfConfig { attr, name }.set_exlude_hv(true)
     }
 }
-
-

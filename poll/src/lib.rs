@@ -16,6 +16,7 @@ pub struct Poller<'a> {
 }
 
 impl<'a> Poller<'a> {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             fds: Vec::new(),
@@ -38,6 +39,8 @@ impl<'a> Poller<'a> {
         self.handlers.push(Box::new(handler));
     }
 
+    /// # Errors
+    /// Returns an error if `poll(2)` fails or if a registered handler returns an error.
     pub fn poll_once(&mut self) -> Result<PollAction, std::io::Error> {
         let ret = unsafe {
             libc::poll(
@@ -61,6 +64,8 @@ impl<'a> Poller<'a> {
         Ok(PollAction::Continue)
     }
 
+    /// # Errors
+    /// Returns an error if `poll(2)` fails or if a registered handler returns an error.
     pub fn run(&mut self) -> Result<(), std::io::Error> {
         loop {
             match self.poll_once()? {

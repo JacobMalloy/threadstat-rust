@@ -6,6 +6,9 @@ edition = "2024"
 [features]
 pfm = []
 
+[lints]
+workspace = true
+
 [build-dependencies]
 bindgen = "0.71"
 

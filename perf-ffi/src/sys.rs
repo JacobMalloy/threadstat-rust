@@ -1,8 +1,12 @@
-#![allow(non_upper_case_globals)]
-#![allow(non_camel_case_types)]
-#![allow(non_snake_case)]
-#![allow(dead_code)]
-#![allow(unsafe_op_in_unsafe_fn)]
-#![allow(unnecessary_transmutes)]
-
-include!(concat!(env!("OUT_DIR"), "/perf_bindings.rs"));
+#[allow(
+    clippy::all,
+    warnings,
+    non_upper_case_globals,
+    non_camel_case_types,
+    non_snake_case,
+    dead_code
+)]
+mod perf_bindings {
+    include!(concat!(env!("OUT_DIR"), "/perf_bindings.rs"));
+}
+pub use perf_bindings::*;

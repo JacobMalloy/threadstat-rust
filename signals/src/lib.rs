@@ -35,7 +35,7 @@ impl Signal {
             return Err(std::io::Error::last_os_error());
         }
 
-        for i in input.into_iter() {
+        for i in input {
             if unsafe { libc::sigaddset(rv.as_mut_ptr(), (*(i.borrow())) as libc::c_int) } == -1 {
                 return Err(std::io::Error::last_os_error());
             }
@@ -44,13 +44,15 @@ impl Signal {
         Ok(unsafe { rv.assume_init() })
     }
 
+    /// # Errors
+    /// Returns an error if `sigprocmask` or signal set construction fails.
     pub fn block<I, T>(signals: I) -> Result<(), std::io::Error>
     where
         I: IntoIterator<Item = T>,
         T: Borrow<Signal>,
     {
         let mask = Self::get_mask(signals)?;
-        let res = unsafe { sigprocmask(libc::SIG_BLOCK, &mask as *const sigset_t, ptr::null_mut()) };
+        let res = unsafe { sigprocmask(libc::SIG_BLOCK, &raw const mask, ptr::null_mut()) };
         if res == -1{
             Err(std::io::Error::last_os_error())
         }else{
@@ -64,29 +66,34 @@ pub struct SignalFD {
 }
 
 impl SignalFD {
+    /// # Errors
+    /// Returns an error if signal set construction or `signalfd(2)` fails.
     pub fn new<I, T>(signals: I) -> Result<Self, std::io::Error>
     where
         I: IntoIterator<Item = T>,
         T: Borrow<Signal>,
     {
         let signal_mask = Signal::get_mask(signals)?;
-        let rv = unsafe { libc::signalfd(-1, &signal_mask as *const sigset_t, libc::SFD_CLOEXEC) };
+        let rv = unsafe { libc::signalfd(-1, &raw const signal_mask, libc::SFD_CLOEXEC) };
 
         Ok(SignalFD {
             fd: unsafe { OwnedFd::from_raw_fd(rv) },
         })
     }
-
+    
+    #[must_use]
     pub fn as_fd(&self) -> BorrowedFd<'_> {
         self.fd.as_fd()
     }
 
+    /// # Errors
+    /// Returns an error if the underlying `read(2)` syscall fails.
     pub fn read(&self) -> Result<libc::signalfd_siginfo, std::io::Error> {
         let mut info: MaybeUninit<libc::signalfd_siginfo> = MaybeUninit::uninit();
         let read = unsafe {
             libc::read(
                 self.fd.as_raw_fd(),
-                info.as_mut_ptr() as *mut libc::c_void,
+                info.as_mut_ptr().cast(),
                 size_of::<libc::signalfd_siginfo>(),
             )
         };

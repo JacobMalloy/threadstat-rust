@@ -5,18 +5,22 @@ use std::ops::{Deref, DerefMut, Index, IndexMut};
 pub struct NonEmpty<U>(Box<[U]>);
 
 impl<U> NonEmpty<U> {
+    #[must_use]
     pub fn new_single(val: U) -> Self {
         Self(Box::new([val]))
     }
 
+    #[must_use]
     pub fn first(&self) -> &U {
         unsafe { self.0.get_unchecked(0) }
     }
 
+    #[must_use]
     pub fn is_empty() -> bool {
         false
     }
 
+    #[must_use]
     pub fn first_mut(&mut self) -> &mut U {
         unsafe { self.0.get_unchecked_mut(0) }
     }
@@ -34,6 +38,7 @@ impl<U> NonEmpty<U> {
 pub struct MaybeNonEmpty<U>(pub Option<NonEmpty<U>>);
 
 impl<U> MaybeNonEmpty<U> {
+    #[must_use]
     pub fn into_option(self) -> Option<NonEmpty<U>> {
         self.0
     }
