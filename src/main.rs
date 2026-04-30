@@ -153,7 +153,7 @@ impl CsvWriters {
 
 struct State {
     event_configs: Vec<NonEmpty<perf_ffi::PerfConfig<InternC>>>,
-    groups: HashMap<i32, Vec<perf_ffi::PerfEventGroup<InternC>>>,
+    groups: HashMap<i32, Vec<perf_ffi::PerfStatGroup<InternC>>>,
     reader: perf_ffi::PerfGroupReader,
     csv: CsvWriters,
 }
@@ -167,7 +167,7 @@ impl State {
             .event_configs
             .iter()
             .filter_map(
-                |config| match perf_ffi::PerfEventGroup::new(config.iter(), tid) {
+                |config| match perf_ffi::PerfStatGroup::new(config.iter(), tid) {
                     Ok(g) => Some(g),
                     Err(e) => {
                         eprintln!("failed to open events for tid {tid}: {e}");
@@ -189,7 +189,7 @@ impl State {
         self.groups.insert(tid, tid_groups);
     }
 
-    fn flush_groups(groups: &[perf_ffi::PerfEventGroup<InternC>], tid: i32, reader: &mut perf_ffi::PerfGroupReader, csv: &mut CsvWriters) {
+    fn flush_groups(groups: &[perf_ffi::PerfStatGroup<InternC>], tid: i32, reader: &mut perf_ffi::PerfGroupReader, csv: &mut CsvWriters) {
         for group in groups {
             let read_id = READ_ID.fetch_add(1, Ordering::Relaxed);
             let timestamp = SystemTime::now()

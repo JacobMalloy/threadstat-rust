@@ -1,4 +1,4 @@
-use crate::perf_event::PerfEventGroup;
+use crate::perf_stat::PerfStatGroup;
 use crate::read_structs;
 use core::alloc::{Layout, LayoutError};
 use core::mem::MaybeUninit;
@@ -78,7 +78,7 @@ impl PerfGroupReader {
     /// cannot be interpreted as the expected perf group read structures.
     pub fn read_group<'a, T>(
         &'a mut self,
-        group: &PerfEventGroup<T>,
+        group: &PerfStatGroup<T>,
     ) -> Result<(GroupInfo, impl Iterator<Item = EventInfo> + 'a), crate::error::Error<'a>> {
         let buf = self.ensure_sized(group.len());
         let (header, events) = group.read(buf)?;

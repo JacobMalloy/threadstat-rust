@@ -15,12 +15,12 @@ use std::io;
 use std::os::fd::{AsFd, AsRawFd, BorrowedFd, FromRawFd, OwnedFd, RawFd};
 use zerocopy::FromBytes;
 
-pub struct PerfEvent<NameType> {
+pub struct PerfStat<NameType> {
     fd: OwnedFd,
     name: NameType,
 }
 
-impl<NameType> PerfEvent<NameType> {
+impl<NameType> PerfStat<NameType> {
     fn get_id(&self) -> Result<u64, std::io::Error> {
         let mut return_value: u64 = 0;
         let ioctl_res =
@@ -59,11 +59,11 @@ fn perf_event_open(
     }
 }
 
-pub struct PerfEventGroup<T> {
-    fds: NonEmpty<PerfEvent<T>>,
+pub struct PerfStatGroup<T> {
+    fds: NonEmpty<PerfStat<T>>,
 }
 
-impl<T: Clone> PerfEventGroup<T> {
+impl<T: Clone> PerfStatGroup<T> {
     /// # Errors
     /// Returns [`crate::error::Error::Empty`] if `input` is empty, or
     /// [`crate::error::Error::IO`] if any `perf_event_open(2)` syscall fails.
@@ -85,14 +85,14 @@ impl<T: Clone> PerfEventGroup<T> {
 
         let rest_iterator = it.map(|config| {
             let c = config.as_ref();
-            <Result<PerfEvent<T>, std::io::Error>>::Ok(PerfEvent {
+            <Result<PerfStat<T>, std::io::Error>>::Ok(PerfStat {
                 fd: perf_event_open(&c.attr, pid, -1, first_raw, PERF_FLAG_FD_CLOEXEC.into())?,
                 name: c.name.clone(),
             })
         });
 
-        let collected: Result<MaybeNonEmpty<PerfEvent<T>>, std::io::Error> =
-            core::iter::once(Ok(PerfEvent {
+        let collected: Result<MaybeNonEmpty<PerfStat<T>>, std::io::Error> =
+            core::iter::once(Ok(PerfStat {
                 fd: first_fd,
                 name: first_name,
             }))
@@ -107,7 +107,7 @@ impl<T: Clone> PerfEventGroup<T> {
     }
 }
 
-impl<T> PerfEventGroup<T> {
+impl<T> PerfStatGroup<T> {
     #[must_use]
     pub fn len(&self) -> usize {
         self.fds.len()
