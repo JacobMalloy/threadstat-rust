@@ -1,0 +1,16 @@
+[package]
+name = "threadstat-rust"
+version = "0.1.0"
+edition = "2024"
+
+[lints]
+workspace = true
+
+[dependencies]
+clap = { workspace = true }
+mqueue = { path = "../mqueue" }
+signals = { path = "../signals" }
+poll = { path = "../poll" }
+threadstat-message = { path = "../threadstat-message" }
+threadstat-shared = {path = "../threadstat-shared/"}
+timerfd = { path = "../timerfd" }

@@ -3,7 +3,7 @@ use std::path::PathBuf;
 
 fn main() {
     let bindings = bindgen::Builder::default()
-        .header("wrapper/shared_def.h")
+        .header("../wrapper/shared_def.h")
         .derive_default(true)
         .impl_debug(true)
         .generate()

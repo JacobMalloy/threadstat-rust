@@ -1,0 +1,13 @@
+[package]
+name = "threadstat-message"
+version = "0.1.0"
+edition = "2024"
+
+[lints]
+workspace = true
+
+[build-dependencies]
+bindgen = "0.71"
+
+[dependencies]
+mqueue = { path = "../mqueue" }

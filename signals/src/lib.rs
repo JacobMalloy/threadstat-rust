@@ -75,6 +75,10 @@ impl SignalFD {
     {
         let signal_mask = Signal::get_mask(signals)?;
         let rv = unsafe { libc::signalfd(-1, &raw const signal_mask, libc::SFD_CLOEXEC) };
+        if rv == -1 {
+            // OwnedFd's invariant is that it holds an open fd, and -1 is its niche.
+            return Err(std::io::Error::last_os_error());
+        }
 
         Ok(SignalFD {
             fd: unsafe { OwnedFd::from_raw_fd(rv) },
@@ -88,7 +92,7 @@ impl SignalFD {
 
     /// # Errors
     /// Returns an error if the underlying `read(2)` syscall fails.
-    pub fn read(&self) -> Result<libc::signalfd_siginfo, std::io::Error> {
+    pub fn read(&mut self) -> Result<libc::signalfd_siginfo, std::io::Error> {
         let mut info: MaybeUninit<libc::signalfd_siginfo> = MaybeUninit::uninit();
         let read = unsafe {
             libc::read(
