@@ -39,7 +39,7 @@ impl CsvWriter {
     }
 
     pub fn write_event(&mut self, read_id: u64, count: u64, id: u64) -> Result<(), io::Error> {
-        write!(self.event, "{read_id},{count},{id}")
+        writeln!(self.event, "{read_id},{count},{id}")
     }
 
     pub fn write_read(
